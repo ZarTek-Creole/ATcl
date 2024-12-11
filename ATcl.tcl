@@ -166,7 +166,8 @@ proc ::atcl::safeEval {command args} {
 proc ::atcl::isBotOwner {nick chan} {
     variable allowUsers
     if {[lsearch -exact ${allowUsers} ${nick}] == -1} {
-        set msg                        "${nick} access denied. Only allowed for the owner."
+        set msg                        "${nick} access denied. Only allowed for \
+                                        the owner."
         ::atcl::logError ${msg} ${chan}
         error ${msg}
     }
@@ -257,4 +258,5 @@ proc ::atcl::tcl {nick host hand chan args} {
 }
 
 # Log module loading
-putlog "\[aTCL Script v1.6\] Module loaded with enhanced security, optimizations, and centralized error handling."
+putlog "\[aTCL Script v1.6\] Module loaded with enhanced security, \
+optimizations, and centralized error handling."
