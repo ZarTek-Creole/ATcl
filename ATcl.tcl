@@ -92,10 +92,13 @@ namespace eval ::atcl {
 }
 
 # Cleanup function to unload the module
+# ------------------------------------------------------------------------------
 # Args:
-#     args (list): List of arguments (unused, optional for compatibility)
+#     args (list): Unused, optional arguments for compatibility.
+# Returns:
+#     None
 # Description:
-#     Deletes the namespace and logs the unload event.
+#     Unloads the module and deletes its namespace.
 proc ::atcl::deInit {args} {
     catch {
         namespace delete [namespace current]
@@ -104,21 +107,18 @@ proc ::atcl::deInit {args} {
 }
 
 # Format execution time
+# ------------------------------------------------------------------------------
 # Args:
-#     startTime (int): Start time in microseconds
-#     endTime (int): End time in microseconds
+#     startTime (int): Start time in microseconds.
+#     endTime (int): End time in microseconds.
 # Returns:
-#     string: Formatted execution time as "X.XXms" or "XXXµs"
+#     string: Formatted execution time as "X.XXms" or "XXXµs".
 proc ::atcl::formatExecutionTime {startTime endTime} {
-    # Calculate elapsed time in microseconds
     set elapsed                        [expr {$endTime - $startTime}]
 
-    # If less than 1ms, use µs
     if {$elapsed < 1000} {
         return "${elapsed}µs"
     }
-
-    # Otherwise, convert to ms with 1 decimal place
     set elapsedMs                      [expr {$elapsed / 1000.0}]
     if {$elapsedMs < 0.1} {
         return "0.1ms"
@@ -128,11 +128,12 @@ proc ::atcl::formatExecutionTime {startTime endTime} {
 }
 
 # Safe evaluation function for commands
+# ------------------------------------------------------------------------------
 # Args:
-#     command (string): Command to evaluate
-#     args (list): List of arguments for the command
+#     command (string): The command to evaluate.
+#     args (list): List of arguments for the command.
 # Returns:
-#     string: The result of the evaluation or a cleaned error message
+#     string: The result of the evaluation or a cleaned error message.
 proc ::atcl::safeEval {command args} {
     set args                           [join $args]
     try {
@@ -156,11 +157,14 @@ proc ::atcl::safeEval {command args} {
 }
 
 # Check if the user is a bot owner
+# ------------------------------------------------------------------------------
 # Args:
-#     nick (string): The nickname of the user
-#     chan (string): The channel where the command is executed
+#     nick (string): Nickname of the user.
+#     chan (string): Channel where the command is executed.
 # Raises:
-#     Error if the user is not a bot owner
+#     Error: If the user is not a bot owner.
+# Returns:
+#     None
 # Description:
 #     Validates whether the user is part of the bot allowUsers.
 proc ::atcl::isBotOwner {nick chan} {
@@ -174,10 +178,11 @@ proc ::atcl::isBotOwner {nick chan} {
 }
 
 # Validate commands against the denied list
+# ------------------------------------------------------------------------------
 # Args:
-#     command (string): The command to validate
+#     command (string): The command to validate.
 # Returns:
-#     int: 1 if the command is allowed, 0 otherwise
+#     int: 1 if the command is allowed, 0 otherwise.
 # Description:
 #     Prevents the execution of commands listed in `deniedCommands`.
 proc ::atcl::isCommandDenied {command} {
@@ -186,9 +191,12 @@ proc ::atcl::isCommandDenied {command} {
 }
 
 # Log errors and notify users
+# ------------------------------------------------------------------------------
 # Args:
-#     message (string): The error message to log and send
-#     chan (string): The channel where the message is sent
+#     message (string): The error message to log and send.
+#     chan (string): The channel where the message is sent.
+# Returns:
+#     None
 # Description:
 #     Logs the error in the bot's logs and sends a notification to the user.
 proc ::atcl::logError {message chan} {
@@ -197,12 +205,15 @@ proc ::atcl::logError {message chan} {
 }
 
 # Main debug command handler
+# ------------------------------------------------------------------------------
 # Args:
-#     nick (string): The nickname of the user
-#     host (string): The hostname of the user
-#     hand (string): The user handle
-#     chan (string): The channel where the command is executed
-#     args (list): The arguments passed to the command
+#     nick (string): Nickname of the user.
+#     host (string): Hostname of the user.
+#     hand (string): User handle.
+#     chan (string): Channel where the command is executed.
+#     args (list): Arguments passed to the command.
+# Returns:
+#     None
 # Description:
 #     Handles command execution, validates permissions, and formats the response.
 proc ::atcl::tcl {nick host hand chan args} {
