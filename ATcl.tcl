@@ -12,7 +12,7 @@
 #   Author       : ZarTek-Creole                                               #
 #   GitHub       : https://github.com/ZarTek-Creole                            #
 #   Script URL   : https://github.com/ZarTek-Creole/ATcl                       #
-#   Version      : 1.6                                                         #
+#   Version      : 1.1                                                         #
 #                                                                              #
 ################################################################################
 #                                                                              #
@@ -45,7 +45,7 @@
 #                                                                              #
 #                                Changelog                                     #
 #                                                                              #
-#   Version 1.6                                                                #
+#   Version 1.1                                                                #
 #   - Modularized the code with namespaces and separated responsibilities.     #
 #   - Added `safeEval` for secure command execution with validation.           #
 #   - Enhanced execution time precision with microseconds support.             #
@@ -56,6 +56,11 @@
 #                                                                              #
 #   Version 1.0                                                                #
 #   - Initial release with basic command execution and logging.                #
+#   - Corrected the main command handler to handle empty and multi-line        #
+#     responses more effectively.                                              #
+#   - Refactored the code to centralize repetitive patterns into utility        #
+#     functions.                                                               #
+#   - Improved logging and error handling readability.                         #
 #                                                                              #
 ################################################################################
 #                                                                              #
@@ -74,10 +79,10 @@
 namespace eval ::atcl {
 
     # List of bot allowUsers (string)
-    variable allowUsers                 "ZarTek Maloya Frozzak aMakafyta nkR _F0X_"
+    variable allowUsers                 "MyName"
 
     # Denied commands for execution (list)
-    variable deniedCommands             {}
+    variable deniedCommands             {die exec}
 
     # List of commands to bind (string)
     variable listCommands               "atcl ${::botnick}tcl ${::nick}tcl"
@@ -91,6 +96,20 @@ namespace eval ::atcl {
     }
 }
 
+# Utility: Log a message and send to the channel
+# ------------------------------------------------------------------------------
+# Args:
+#     message (string): The message to log and send.
+#     chan (string): The channel for the message.
+# Returns:
+#     None
+# Description:
+#     Logs a message to the bot's log and sends it to a specified channel.
+proc ::atcl::logAndSend {message chan} {
+    putlog "atcl: ${message}"
+    putnow "PRIVMSG ${chan} :${message}"
+}
+
 # Cleanup function to unload the module
 # ------------------------------------------------------------------------------
 # Args:
@@ -98,11 +117,9 @@ namespace eval ::atcl {
 # Returns:
 #     None
 # Description:
-#     Unloads the module and deletes its namespace.
+#     Deletes the namespace and logs the unload event.
 proc ::atcl::deInit {args} {
-    catch {
-        namespace delete [namespace current]
-    }
+    catch {namespace delete [namespace current]}
     putlog "atcl: Module unloaded."
 }
 
@@ -113,18 +130,14 @@ proc ::atcl::deInit {args} {
 #     endTime (int): End time in microseconds.
 # Returns:
 #     string: Formatted execution time as "X.XXms" or "XXXµs".
+# Description:
+#     Calculates and formats the elapsed time between two timestamps.
 proc ::atcl::formatExecutionTime {startTime endTime} {
-    set elapsed                        [expr {$endTime - $startTime}]
-
-    if {$elapsed < 1000} {
-        return "${elapsed}µs"
-    }
-    set elapsedMs                      [expr {$elapsed / 1000.0}]
-    if {$elapsedMs < 0.1} {
-        return "0.1ms"
-    } else {
-        return [format "%.1fms" $elapsedMs]
-    }
+    set elapsed                        [expr {$endTime - $startTime}]; # Calculate elapsed time
+    # Check for microseconds
+    if {$elapsed < 1000} { return "${elapsed}µs" }
+    # Convert to milliseconds
+    return [format "%.1fms" [expr {$elapsed / 1000.0}]]
 }
 
 # Safe evaluation function for commands
@@ -134,6 +147,8 @@ proc ::atcl::formatExecutionTime {startTime endTime} {
 #     args (list): List of arguments for the command.
 # Returns:
 #     string: The result of the evaluation or a cleaned error message.
+# Description:
+#     Evaluates a command with arguments safely and captures any errors.
 proc ::atcl::safeEval {command args} {
     set args                           [join $args]
     try {
@@ -161,19 +176,18 @@ proc ::atcl::safeEval {command args} {
 # Args:
 #     nick (string): Nickname of the user.
 #     chan (string): Channel where the command is executed.
-# Raises:
-#     Error: If the user is not a bot owner.
 # Returns:
 #     None
+# Raises:
+#     Error: If the user is not a bot owner.
 # Description:
-#     Validates whether the user is part of the bot allowUsers.
+#     Checks if a user is authorized as a bot owner.
 proc ::atcl::isBotOwner {nick chan} {
     variable allowUsers
     if {[lsearch -exact ${allowUsers} ${nick}] == -1} {
-        set msg                        "${nick} access denied. Only allowed for \
-                                        the owner."
-        ::atcl::logError ${msg} ${chan}
-        error ${msg}
+        ::atcl::logAndSend "${nick} access denied. Only allowed for the owner." \
+                           ${chan}
+        error "${nick} access denied."
     }
 }
 
@@ -184,24 +198,10 @@ proc ::atcl::isBotOwner {nick chan} {
 # Returns:
 #     int: 1 if the command is allowed, 0 otherwise.
 # Description:
-#     Prevents the execution of commands listed in `deniedCommands`.
+#     Validates whether a command is allowed to execute.
 proc ::atcl::isCommandDenied {command} {
     variable deniedCommands
-    return [expr {!([lsearch -exact ${deniedCommands} ${command}] != -1)}]
-}
-
-# Log errors and notify users
-# ------------------------------------------------------------------------------
-# Args:
-#     message (string): The error message to log and send.
-#     chan (string): The channel where the message is sent.
-# Returns:
-#     None
-# Description:
-#     Logs the error in the bot's logs and sends a notification to the user.
-proc ::atcl::logError {message chan} {
-    putlog "Error: ${message}"
-    putnow "PRIVMSG ${chan} :${message}"
+    return [expr {[lsearch -exact ${deniedCommands} ${command}] == -1}]
 }
 
 # Main debug command handler
@@ -215,25 +215,26 @@ proc ::atcl::logError {message chan} {
 # Returns:
 #     None
 # Description:
-#     Handles command execution, validates permissions, and formats the response.
+#     Handles command execution, validates permissions, and sends formatted responses.
 proc ::atcl::tcl {nick host hand chan args} {
     set args                           [split [join $args]]
     putlog "atcl: ${nick} ${host} ${hand} ${chan} ${args}"
 
-    # Validate if the user is authorized
+    # Validate user
     ::atcl::isBotOwner ${nick} ${chan}
 
     # Ensure a command is provided
     if {[llength ${args}] == 0} {
-        ::atcl::logError "No command provided." ${chan}
+        ::atcl::logAndSend "No command provided." ${chan}
         return
     }
-    set command                        [lrange ${args} 0 0]
+
+    set command                        [lindex ${args} 0]
     set commandArgs                    [lrange ${args} 1 end]
 
-    # Check if the command is allowed
-    if {![atcl::isCommandDenied ${command}]} {
-        ::atcl::logError "Access denied for command: ${command}" ${chan}
+    # Check command validity
+    if {![::atcl::isCommandDenied ${command}]} {
+        ::atcl::logAndSend "Access denied for command: ${command}" ${chan}
         return
     }
 
@@ -243,31 +244,29 @@ proc ::atcl::tcl {nick host hand chan args} {
     # Measure execution time
     set start                          [clock microseconds]
     try {
-        # Execute the command safely
-        set result                    [::atcl::safeEval ${command} ${commandArgs}]
-        set count                     [regexp -all -inline {\n} $result]
-        if {$count != 0} {
-            set result                "\n'\n${result}\n'"
+        set result [::atcl::safeEval ${command} ${commandArgs}]
+        # Check for empty result
+        if {[string length ${result}] == 0} {
+            set response                 "Execution successful"
+        } else {
+          #  Check for multi-line result
+          if {[regexp -all -inline {\n} ${result}] != 0} {
+              set response               "Execution successful\n'\n${result}\n'"; # Add newlines for multi-line results
+          } else  {
+              set response               "Execution successful: ${result}";       # Single-line result
+          }
         }
-        set response                  "Execution successful: ${result}"
     } on error {errorMessage} {
-        # Clean the error message for user output
-        set cleanedError              [lindex [split $errorMessage "\n"] 0]
-        set response                  "Execution failed: ${cleanedError}"
+        set response                   "Execution failed: ${errorMessage}";     # Log error
     }
-    set end                            [clock microseconds]
+    set end                             [clock microseconds];                   # Measure execution time
+    append response " - [::atcl::formatExecutionTime ${start} ${end}]";         # Add execution time to response
 
-    # Format execution time
-    set executionTimeStr               [::atcl::formatExecutionTime $start $end]
-    append response                   " - ${executionTimeStr}"
-
-    # Split multi-line responses for better user output
-    set response                       [split ${response} "\n"]
-    foreach line ${response} {
+    # Send response
+    foreach line [split ${response} "\n"] {
         putnow "PRIVMSG ${chan} :${line}"
     }
 }
 
 # Log module loading
-putlog "\[aTCL Script v1.6\] Module loaded with enhanced security, \
-optimizations, and centralized error handling."
+putlog "\[aTCL Script v1.1\] Module loaded with enhanced security, optimizations, and centralized error handling."
